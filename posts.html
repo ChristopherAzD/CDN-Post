@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Posts Widget</title>
+  <style>
+    * { box-sizing: border-box; }
+    :root { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #17203-3; background: transparent; }
+    body { margin: 0; padding: 16px; }
+    .ww-posts { max-width: 1200px; margin: 0 auto; }
+    .ww-posts__head { margin-bottom: 18px; }
+    .ww-posts__eyebrow { margin: 0 0 5px; color: #6d5bd0; font-size: 11px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+    .ww-posts__name { margin: 0; font-size: clamp(22px, 4vw, 32px); line-height: 1.15; letter-spacing: -.035em; }
+    .ww-posts__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 16px; }
+    .ww-posts__card { overflow: hidden; border: 1px solid #e5e7eb; border-radius: 18px; background: #fff; box-shadow: 0 10px 32px rgba(17, 24, 39, .07); }
+    .ww-posts__image { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; background: #f3f4f6; }
+    .ww-posts__body { padding: 18px; }
+    .ww-posts__category { margin: 0; font-size: 18px; line-height: 1.3; }
+    .ww-posts__slogan { margin: 8px 0 0; color: #64748b; font-size: 14px; line-height: 1.5; }
+    .ww-posts__empty { margin: 0; padding: 24px; border: 1px dashed #cbd5e1; border-radius: 16px; color: #64748b; text-align: center; }
+    .ww-posts__error { margin: 0; padding: 16px; border: 1px solid #fecaca; border-radius: 12px; background: #fef2f2; color: #991b1b; font-size: 14px; }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) { color: #f8fafc; background: #101827; }
+      :root:not([data-theme="light"]) .ww-posts__card { border-color: #334155; background: #172033; box-shadow: none; }
+      :root:not([data-theme="light"]) .ww-posts__slogan, :root:not([data-theme="light"]) .ww-posts__empty { color: #94a3b8; }
+    }
+    :root[data-theme="dark"] { color: #f8fafc; background: #101827; }
+    :root[data-theme="dark"] .ww-posts__card { border-color: #334155; background: #172033; box-shadow: none; }
+    :root[data-theme="dark"] .ww-posts__slogan, :root[data-theme="dark"] .ww-posts__empty { color: #94a3b8; }
+  </style>
+</head>
+<body data-ww-posts-widget>
+  <main id="ww-posts" class="ww-posts" aria-live="polite"></main>
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      var apiUrl = params.get('api');
+      var theme = params.get('theme');
+      var root = document.getElementById('ww-posts');
+      if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
+
+      function element(tag, className, text) {
+        var node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text) node.textContent = text;
+        return node;
+      }
+
+      function render(payload) {
+        root.replaceChildren();
+        var posts = Array.isArray(payload.posts) ? payload.posts : [];
+        var head = element('header', 'ww-posts__head');
+        head.append(element('p', 'ww-posts__eyebrow', 'Publicaciones'));
+        head.append(element('h1', 'ww-posts__name', payload.profile && payload.profile.name || 'Posts'));
+        root.append(head);
+
+        if (!posts.length) {
+          root.append(element('p', 'ww-posts__empty', 'No hay publicaciones activas en este momento.'));
+          return;
+        }
+
+        var grid = element('div', 'ww-posts__grid');
+        posts.forEach(function (post) {
+          var card = element('article', 'ww-posts__card');
+          if (post.postImageUrl) {
+            var image = element('img', 'ww-posts__image');
+            image.src = post.postImageUrl;
+            image.alt = post.category || 'Imagen del post';
+            image.loading = 'lazy';
+            card.append(image);
+          }
+          var body = element('div', 'ww-posts__body');
+          body.append(element('h2', 'ww-posts__category', post.category || 'Publicación'));
+          if (Array.isArray(post.slogans) && post.slogans[0]) body.append(element('p', 'ww-posts__slogan', post.slogans[0]));
+          card.append(body);
+          grid.append(card);
+        });
+        root.append(grid);
+      }
+
+      async function refresh() {
+        try {
+          if (!apiUrl) throw new Error('Falta el parámetro api en la URL del widget.');
+          var parsed = new URL(apiUrl);
+          if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(parsed.hostname))) throw new Error('La URL del API debe usar HTTPS.');
+          var response = await fetch(parsed.href, { cache: 'no-store' });
+          if (!response.ok) throw new Error('No se pudieron cargar las publicaciones (' + response.status + ').');
+          render(await response.json());
+        } catch (error) {
+          root.replaceChildren(element('p', 'ww-posts__error', error.message || 'No se pudieron cargar las publicaciones.'));
+        }
+      }
+
+      refresh();
+      window.setInterval(refresh, 60000);
+      document.addEventListener('visibilitychange', function () { if (!document.hidden) refresh(); });
+    })();
+  </script>
+</body>
+</html>
